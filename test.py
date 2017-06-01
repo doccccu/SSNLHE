@@ -4,6 +4,7 @@
 
 poker_colours = ['s', 'h', 'c', 'd']
 poker_values = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
+poker_dict = {'A': 12, 'K': 11, 'Q': 10, 'J': 9, 'T': 8, '9': 7, '8': 6, '7': 5, '6': 4, '5': 3, '4': 2, '3': 1, '2': 0}
 
 
 def is_poker_str(range_a):
@@ -50,31 +51,11 @@ def is_repeat(range_a, range_b, flop):
     # 有重复返回True
     # 没有返回False
 
-    # 判断range_a
-    for one in range_a:
-        for tmp in range_b:
-            if one == tmp:
-                return True
-        for tmp in flop:
-            if one == flop:
-                return True
-    # 判断range_b
-    for one in range_b:
-        for tmp in range_a:
-            if one == tmp:
-                return True
-        for tmp in flop:
-            if one == tmp:
-                return True
-    # 判断flop
-    for one in flop:
-        for tmp in range_a:
-            if one == tmp:
-                return True
-        for tmp in range_b:
-            if one == tmp:
-                return True
-    return False
+    tmp = range_a + range_b + flop
+    if len(list(set(tmp))) == len(tmp):
+        return False
+
+    return True
 
 
 def input_check(range_a, range_b, flop):
@@ -132,7 +113,102 @@ def judge_royal_flush(range_a):
 def judge_straight_flush(range_a):
     # 判断是否存在straight flush
     # 存在返回第一个牌的index  不存在返回-1
-    pass
+
+    # 第一张牌的范围 6 - K
+    # index范围   4 － 11
+    for i in range(11, 3, -1):
+        for j in range(0, len(poker_colours)):
+            tmp = [poker_values[i] + poker_colours[j],
+                   poker_values[i - 1] + poker_colours[j],
+                   poker_values[i - 2] + poker_colours[j],
+                   poker_values[i - 3] + poker_colours[j],
+                   poker_values[i - 4] + poker_colours[j]]
+            if judge_inside(range_a, tmp) is True:
+                return i
+    # 考虑第一张牌为5的特殊情况
+    for j in range(0, len(poker_colours)):
+        tmp = ['A' + poker_colours[j],
+               '2' + poker_colours[j],
+               '3' + poker_colours[j],
+               '4' + poker_colours[j],
+               '5' + poker_colours[j]]
+        if judge_inside(range_a, tmp) is True:
+            # 5 的index为 3
+            return 3
+
+    # 不存在straight flush
+    return -1
+
+
+def judge_high_card(range_a, range_b):
+    # 用高牌来判断大小
+    # 返回1，0，－1
+    flag_a = -1
+    flag_b = -1
+    for i in range(12, -1, -1):
+        for j in range(0, len(poker_colours)):
+            tmp = poker_values[i] + poker_colours[j]
+            if tmp in range_a and flag_a == -1:
+                flag_a = i
+        if flag_a != -1:
+            break
+    for i in range(12, -1, -1):
+        for j in range(0, len(poker_colours)):
+            tmp = poker_values[i] + poker_colours[j]
+            if tmp in range_b and flag_b == -1:
+                flag_b = i
+        if flag_b != -1:
+            break
+
+    if flag_a == flag_b:
+        return 0
+    if flag_a > flag_b:
+        return 1
+    if flag_a < flag_b:
+        return -1
+
+    return 10000
+
+
+def judge_four(range_a, range_b):
+    # 用四条来判断大小
+    # 如果可以判断大小 那么返回1，0，－1
+    # 如果不能判断大小 也就是a，b均不存在四条那么返回10000
+    
+    # 炸弹的第一张牌范围 2 - A
+    for i in range(12, -1, -1):
+        flag_a = False
+        flag_b = False
+        tmp = []
+        for j in range(0, len(poker_colours)):
+            tmp.append(poker_values[i] + poker_colours[j])
+
+        if judge_inside(range_a, tmp):
+                flag_a = True
+        if judge_inside(range_b, tmp):
+                flag_b = True
+        if flag_a is True and flag_b is True:
+            # a和b存在一样大小的四条 需要判断单张大小
+            # 将手牌信息复制一份 并去掉四条
+            tmp_a = range_a[:]
+            tmp_b = range_b[:]
+            for one in range_a:
+                if one[0] == poker_values[i]:
+                    tmp_a.remove(one)
+            for one in range_b:
+                if one[0] == poker_values[i]:
+                    tmp_b.remove(one)
+
+            return judge_high_card(tmp_a, tmp_b)
+
+        if flag_a is True:
+            # a存在大的四条
+            return 1
+        if flag_b is True:
+            return -1
+
+    # a和b均不存在任何四条
+    return 10000
 
 
 def judge(range_a, range_b, flop):
@@ -149,17 +225,18 @@ def judge(range_a, range_b, flop):
     # 判断Royal Flush
     flag_royal_flush_a = judge_royal_flush(range_a)
     flag_royal_flush_b = judge_royal_flush(range_b)
-    if flag_royal_flush_a and flag_royal_flush_b:
+    if flag_royal_flush_a is True and flag_royal_flush_b is True:
         return 0
-    if flag_royal_flush_a:
+    if flag_royal_flush_a is True:
         return 1
-    if flag_royal_flush_b:
+    if flag_royal_flush_b is True:
         return -1
+
 
     # 判断Straight Flush
     flag_straight_flush_a = judge_straight_flush(range_a)
     flag_straight_flush_b = judge_straight_flush(range_b)
-    if flag_straight_flush_a and flag_straight_flush_b:
+    if flag_straight_flush_a > 0 and flag_straight_flush_b > 0:
         # 通过返回的index判断flush大小
         if flag_straight_flush_a > flag_straight_flush_b:
             return 1
@@ -167,10 +244,16 @@ def judge(range_a, range_b, flop):
             return -1
         if flag_straight_flush_a == flag_straight_flush_b:
             return 0
-    if flag_straight_flush_a:
+    if flag_straight_flush_a > 0:
         return 1
-    if flag_straight_flush_b:
+    if flag_straight_flush_b > 0:
         return -1
+
+    # 判断Four of a Kind
+    flag_four_of_a_kind = judge_four(range_a, range_b)
+    if flag_four_of_a_kind != 10000:
+        # 如果可以比较出结果 那么就返回这个结果
+        return flag_four_of_a_kind
 
     return 0
 
@@ -178,8 +261,8 @@ def judge(range_a, range_b, flop):
 if __name__ == '__main__':
     print "Hello SSNLHE!!! Hello NL200!!"
     range_a = ['As', 'Ah']
-    range_b = ['Kd', 'Kh']
-    flop = ['Kc', 'Qs', 'Js', 'Ts', '3d']
+    range_b = ['Ks', 'Qs']
+    flop = ['Ad', 'Ac', 'Ts', 'Js', '9s']
     input_check(range_a, range_b, flop)
     ret = judge(range_a, range_b, flop)
     print ret
